@@ -1,0 +1,12 @@
+airflow_poc_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: mysql
+      server: mysql-service.default.svc.cluster.local
+      port: 3306
+      schema: dbt_dev
+      username: airflow
+      password: airflow123
+      threads: 4
+      keepalives_idle: 0
