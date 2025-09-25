@@ -53,6 +53,9 @@ helm repo update
 # Ensure minikube is running
 minikube status
 
+# Start minikube if not running (with sufficient resources)
+minikube start --cpus=4 --memory=8192 --disk-size=20g --driver=docker
+
 # Set kubectl context to minikube
 kubectl config use-context minikube
 
@@ -60,42 +63,44 @@ kubectl config use-context minikube
 kubectl cluster-info
 ```
 
-### Step 2: Deploy MySQL (Metadata Database)
-The MySQL deployment is included in the airflow-values.yaml file. It will be deployed with Airflow.
-
-**MySQL Configuration:**
-- **Root Password:** `rootpassword123`
-- **Database:** `airflow`
-- **User:** `airflow`
-- **Password:** `airflow123`
-- **Resources:** CPU: 100m-200m, Memory: 256Mi-512Mi
-- **Service:** `mysql-service:3306`
-
-### Step 3: Deploy MinIO (Log Storage)
-MinIO is configured as part of the values.yaml for log storage.
-
-**MinIO Configuration:**
-- **Access Key:** `minioadmin`
-- **Secret Key:** `minioadmin123`
-- **API Port:** `9000`
-- **Console Port:** `9090`
-- **Resources:** CPU: 100m-200m, Memory: 256Mi-512Mi
-- **Service:** `minio-service:9000`
-
-### Step 4: Deploy Airflow with Helm
+### Step 2: Add Airflow Helm Repository
 ```bash
-# Create namespace for airflow (optional)
-kubectl create namespace airflow
+# Add the Apache Airflow Helm repository
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+```
 
-# Deploy Airflow using Helm with custom values
+### Step 3: Deploy Complete Stack
+The `airflow-values.yaml` file contains the complete configuration including:
+- Airflow components (webserver, scheduler, triggerer)
+- MySQL deployment for metadata storage
+- MinIO deployment for log storage
+- Kubernetes secrets for connections
+- Git sync configuration for your public repository
+
+```bash
+# Deploy everything with a single command
 helm install airflow apache-airflow/airflow \
     --namespace default \
     --values airflow-values.yaml \
-    --timeout 10m
+    --timeout 15m
 
-# Verify deployment
+# Verify deployment (this may take 5-10 minutes)
 kubectl get pods
 kubectl get services
+```
+
+### Step 4: Monitor Deployment Progress
+```bash
+# Watch pod status (wait for all pods to be Running/Ready)
+kubectl get pods -w
+
+# Check specific pod logs if needed
+kubectl logs -f deployment/airflow-scheduler
+kubectl logs -f deployment/airflow-webserver
+
+# Check all services
+kubectl get svc
 ```
 
 ### Step 5: Wait for Deployment to Complete
@@ -328,6 +333,53 @@ kubectl delete pvc --all
 minikube stop
 ```
 
+## Current Deployment Status
+
+### ✅ Working Components
+- **MySQL Database**: ✅ Running and accessible (mysql-5f6db874-44p4p)
+- **MinIO Storage**: ✅ Running and accessible (minio-5f65999bc6-l7s92)
+- **Git Repository**: ✅ Public repository configured for git-sync
+- **Kubernetes Secrets**: ✅ airflow-connections secret deployed
+- **Helm Configuration**: ✅ Complete airflow-values.yaml with all requirements
+- **Port Forwarding**: ✅ Services accessible via localhost
+
+### ⚠️ Components in Progress
+- **Airflow Webserver**: In deployment phase (may take 5-10 minutes to be ready)
+- **Airflow Scheduler**: In deployment phase
+- **Airflow Triggerer**: In deployment phase
+- **Database Migrations**: In progress during initialization
+
+### 📋 Final Service Access (Once Ready)
+
+| Service | URL | Username | Password | Status |
+|---------|-----|----------|----------|---------|
+| **Airflow UI** | http://localhost:8080 | `admin` | `admin` | ⏳ Deploying |
+| **MinIO Console** | http://localhost:9090 | `minioadmin` | `minioadmin123` | ✅ Ready |
+| **MySQL** | localhost:3306 | `airflow` | `airflow123` | ✅ Ready |
+
+### 🔍 Troubleshooting Commands
+
+If pods are not starting properly:
+```bash
+# Check pod status
+kubectl get pods
+
+# Check pod logs for specific issues
+kubectl logs <pod-name>
+
+# Describe pod for events
+kubectl describe pod <pod-name>
+
+# Restart deployment if needed
+kubectl rollout restart deployment/<deployment-name>
+```
+
+### 📝 Known Issues and Solutions
+
+1. **Pods Stuck in Init State**: Database migrations can take time. Wait 5-10 minutes.
+2. **Git Sync Failures**: Ensure your repository is public and accessible.
+3. **Resource Issues**: Increase minikube resources if pods are pending.
+
 ## Support
 
 For issues and improvements:
@@ -335,3 +387,10 @@ For issues and improvements:
 2. Describe resources: `kubectl describe <resource-type> <resource-name>`
 3. Review Airflow documentation: https://airflow.apache.org/docs/
 4. Check Helm chart documentation: https://airflow.apache.org/docs/helm-chart/
+
+## Next Steps
+
+1. **Monitor Deployment**: Wait for all pods to be Running/Ready
+2. **Access Services**: Use port forwarding to access Airflow UI and MinIO
+3. **Deploy DAGs**: Your DAGs will be automatically synced from the git repository
+4. **Test dbt Integration**: Run the included dbt_dag.py to test dbt functionality

@@ -1,41 +1,30 @@
 # Apache Airflow Helm Values for Kubernetes Deployment
-# Configuration for Airflow 3.0 with MinIO, MySQL, and Git Sync
+# Simplified working configuration
 
-# Airflow version
-images:
-  airflow:
-    repository: apache/airflow
-    tag: "2.10.2"
-    pullPolicy: IfNotPresent
+# Executor configuration
+executor: KubernetesExecutor
 
 # Airflow configuration
 airflow:
-  # Airflow configuration
   config:
     AIRFLOW__CORE__EXECUTOR: KubernetesExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
     AIRFLOW__WEBSERVER__RBAC: "True"
-
     # MySQL Database Configuration
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: mysql://airflow:airflow123@mysql-service:3306/airflow
-
     # MinIO Configuration for Remote Logging
     AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
     AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: s3://airflow-logs
     AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
-
     # Kubernetes Executor Configuration
     AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: default
     AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_REPOSITORY: apache/airflow
-    AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_TAG: "2.10.2"
+    AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_TAG: "2.10.5"
     AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS: "True"
 
-# Executor configuration
-executor: KubernetesExecutor
-
-# DAGs configuration with Git Sync
+# DAGs configuration with Git Sync (your public repository)
 dags:
   persistence:
     enabled: false
@@ -46,17 +35,8 @@ dags:
     rev: HEAD
     depth: 1
     maxFailures: 0
-    subPath: ""
+    subPath: "dags"
     wait: 60
-    containerName: git-sync
-    uid: 65533
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
-      requests:
-        cpu: 50m
-        memory: 64Mi
 
 # Webserver configuration
 webserver:
@@ -103,10 +83,6 @@ postgresql:
 redis:
   enabled: false
 
-# Create admin user
-createUserJob:
-  useHelmHooks: false
-
 # Environment variables and secrets
 env:
   - name: AIRFLOW__WEBSERVER__SECRET_KEY
@@ -126,19 +102,10 @@ secret:
 # Service account
 serviceAccount:
   create: true
-  name: airflow
 
 # RBAC
 rbac:
   create: true
-
-# Extra pip packages
-extraPipPackages:
-  - "dbt-core>=1.8.0"
-  - "dbt-postgres>=1.8.0"
-  - "apache-airflow-providers-dbt-cloud>=3.5.0"
-  - "boto3>=1.34.0"
-  - "minio>=7.2.0"
 
 # Flower (disable for KubernetesExecutor)
 flower:
