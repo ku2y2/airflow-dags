@@ -1,124 +1,182 @@
-# Apache Airflow Helm Values for Kubernetes Deployment
-# Simplified working configuration
+# Airflow Values based on working sample.yaml
+# Adapted for Airflow 2.7.0, MySQL, MinIO, and minikube
+
+# Use default Airflow 2.10.2 image (latest stable with better provider support)
+images:
+  airflow:
+    repository: apache/airflow
+    tag: "2.10.2"
+    pullPolicy: IfNotPresent
+
+defaultAirflowRepository: apache/airflow
+defaultAirflowTag: "2.10.2"
+
+# Airflow version 2.10.2
+airflowVersion: "2.10.2"
 
 # Executor configuration
 executor: KubernetesExecutor
 
-# Airflow configuration
-airflow:
-  config:
-    AIRFLOW__CORE__EXECUTOR: KubernetesExecutor
-    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
-    AIRFLOW__WEBSERVER__RBAC: "True"
-    # MySQL Database Configuration
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: mysql://airflow:airflow123@mysql-service:3306/airflow
-    # MinIO Configuration for Remote Logging
-    AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
-    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: s3://airflow-logs
-    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
-    # Kubernetes Executor Configuration
-    AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: default
-    AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_REPOSITORY: apache/airflow
-    AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_TAG: "2.10.5"
-    AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS: "True"
-
-# DAGs configuration with Git Sync (your public repository)
+# DAGs configuration with Git Sync
 dags:
   persistence:
     enabled: false
+    size: 4Gi
+    storageClassName: ""
+    accessMode: ReadWriteMany
   gitSync:
-    enabled: true
-    repo: https://github.com/kundankumar/airflow-dags.git
-    branch: airflow-kubernetes-deployment
-    rev: HEAD
-    depth: 1
-    maxFailures: 0
-    subPath: "dags"
-    wait: 60
-
-# Webserver configuration
-webserver:
-  service:
-    type: ClusterIP
-    ports:
-      - name: airflow-ui
-        port: 8080
-  resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
-    requests:
-      cpu: 250m
-      memory: 512Mi
-
-# Scheduler configuration
-scheduler:
-  resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
-    requests:
-      cpu: 250m
-      memory: 512Mi
-
-# Workers configuration (for KubernetesExecutor)
-workers:
-  persistence:
     enabled: false
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 2Gi
-    requests:
-      cpu: 500m
-      memory: 1Gi
 
 # Disable built-in PostgreSQL
 postgresql:
   enabled: false
 
-# Disable built-in Redis (not needed for KubernetesExecutor)
+# Disable pgbouncer (using MySQL directly)
+pgbouncer:
+  enabled: false
+
+# Database configuration (MySQL)
+data:
+  metadataConnection:
+    user: airflow
+    pass: airflow123
+    protocol: mysql
+    host: mysql-service
+    port: 3306
+    db: airflow
+    sslmode: disable
+
+# Security keys (using the same as your sample)
+fernetKey: "81HqDtbqAywKSOumSHA3BhWNOdQ26slT6K0YaZeZyPs="
+webserverSecretKey: "your-secret-key-here-change-in-production"
+
+# Disable flower and redis (not needed for KubernetesExecutor)
+flower:
+  enabled: false
 redis:
   enabled: false
 
-# Environment variables and secrets
-env:
-  - name: AIRFLOW__WEBSERVER__SECRET_KEY
-    value: "your-secret-key-here-change-in-production"
-  - name: AIRFLOW__CORE__FERNET_KEY
-    value: "81HqDtbqAywKSOumSHA3BhWNOdQ26slT6K0YaZeZyPs="
-
-# Connection secrets
-secret:
-  - envName: AIRFLOW_CONN_MINIO_CONN
-    secretName: airflow-connections
-    secretKey: minio-conn
-  - envName: AIRFLOW_CONN_MYSQL_CONN
-    secretName: airflow-connections
-    secretKey: mysql-conn
-
-# Service account
+# Service account (simplified for local)
 serviceAccount:
   create: true
+  name: ""
+  annotations: {}
 
-# RBAC
-rbac:
-  create: true
-
-# Flower (disable for KubernetesExecutor)
-flower:
-  enabled: false
-
-# StatsD (optional)
+# StatsD (simplified for local)
 statsd:
   enabled: false
 
-# Logs persistence (disabled as we're using MinIO)
-logs:
-  persistence:
-    enabled: false
+# Workers configuration (reduced for local)
+workers:
+  replicas: 1
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  env:
+    - name: AIRFLOW_ENV
+      value: "development"
+
+# Scheduler configuration (reduced for local)
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+# Triggerer configuration (reduced for local)
+triggerer:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+# Webserver configuration (reduced for local)
+webserver:
+  replicas: 1
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  defaultUser:
+    enabled: true
+    role: Admin
+    username: admin
+    email: admin@example.com
+    firstName: admin
+    lastName: user
+    password: admin
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+# User and migration jobs
+createUserJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+migrateDatabaseJob:
+  enabled: true
+  useHelmHooks: false
+  applyCustomEnv: false
+
+# Airflow configuration
+config:
+  core:
+    max_active_runs_per_dag: 1
+    parallelism: 32  # Reduced for local
+    dags_are_paused_at_creation: "True"
+    load_examples: "False"
+    executor: KubernetesExecutor
+  logging:
+    # Remote logging to MinIO (S3-compatible)
+    remote_logging: "True"
+    remote_base_log_folder: "s3://airflow-logs/"
+    remote_log_conn_id: "minio_default"
+    encrypt_s3_logs: "False"
+    logging_level: "INFO"
+  webserver:
+    default_ui_timezone: "UTC"
+    warn_deployment_exposure: "False"
+    show_trigger_form_if_no_params: "True"
+    expose_config: "True"
+  kubernetes:
+    namespace: default
+    worker_container_repository: apache/airflow
+    worker_container_tag: "2.10.2"
+    delete_worker_pods: "True"
+
+# Environment variables for MinIO connection
+env:
+  - name: AIRFLOW_CONN_MINIO_DEFAULT
+    value: "s3://minioadmin:minioadmin123@minio-service:9000?host=http://minio-service:9000&region=us-east-1"
 
 ---
 # MySQL Deployment
@@ -151,11 +209,17 @@ spec:
         - containerPort: 3306
         resources:
           limits:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 500m
+            memory: 1Gi
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 250m
+            memory: 512Mi
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -202,11 +266,17 @@ spec:
         - containerPort: 9090
         resources:
           limits:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 500m
+            memory: 1Gi
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 250m
+            memory: 512Mi
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+      volumes:
+      - name: minio-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -223,14 +293,3 @@ spec:
     port: 9090
     targetPort: 9090
   type: ClusterIP
-
----
-# Airflow Connections Secret
-apiVersion: v1
-kind: Secret
-metadata:
-  name: airflow-connections
-type: Opaque
-stringData:
-  minio-conn: "s3://minioadmin:minioadmin123@minio-service:9000?region=us-east-1&host=http://minio-service:9000"
-  mysql-conn: "mysql://airflow:airflow123@mysql-service:3306/airflow"

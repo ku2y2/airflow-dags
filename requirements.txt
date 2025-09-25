@@ -1,26 +1,20 @@
-# Apache Airflow and core dependencies
-apache-airflow==2.10.2
-apache-airflow-providers-cncf-kubernetes>=7.4.0
-apache-airflow-providers-mysql>=5.4.0
-apache-airflow-providers-amazon>=8.13.0
+# Apache Airflow and core dependencies (compatible with 2.7.0)
+apache-airflow-providers-cncf-kubernetes
+apache-airflow-providers-amazon
+apache-airflow-providers-http
 
-# dbt and related packages
-dbt-core>=1.8.0
-dbt-postgres>=1.8.0
-dbt-mysql>=1.8.0
-apache-airflow-providers-dbt-cloud>=3.5.0
+# dbt and related packages (core only for simplicity)
+dbt-core>=1.7.0,<1.8.0
+dbt-postgres>=1.7.0,<1.8.0
+
+# Database connectors (using PyMySQL instead of mysqlclient)
+pymysql>=1.0.2
 
 # Additional useful packages
-pandas>=2.0.0
-numpy>=1.24.0
-requests>=2.31.0
-boto3>=1.34.0
-sqlalchemy>=1.4.0,<2.0.0
-
-# Development and testing
-pytest>=7.0.0
-pytest-cov>=4.0.0
+pandas>=1.5.0,<2.0.0
+requests>=2.28.0
+boto3>=1.26.0
 
 # Kubernetes and MinIO
-kubernetes>=27.2.0
-minio>=7.2.0
+kubernetes>=24.2.0
+minio>=7.1.0
