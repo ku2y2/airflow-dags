@@ -1,10 +1,337 @@
 # Airflow DAGs Repository
 
-This repository contains Airflow DAGs for the POC deployment.
+This repository contains Airflow DAGs for the POC deployment with comprehensive Kubernetes deployment instructions.
 
 ## DAGs included:
 - `hello_world_dag.py`: Simple demo DAG that prints hello world
+- `dbt_dag.py`: dbt integration DAG for running dbt jobs
 - More DAGs to be added for dbt integration
 
-## Usage:
-This repository is synced with Airflow using git-sync feature in the Kubernetes deployment.
+## Repository Structure
+```
+airflow-dags/
+├── README.md                    # This documentation file
+├── requirements.txt             # Python dependencies for Airflow
+├── airflow-values.yaml         # Helm values for Airflow deployment
+├── dags/                       # Airflow DAG files
+│   ├── hello_world_dag.py
+│   └── dbt_dag.py
+└── dbt/                        # dbt project files
+    ├── models/
+    └── dbt_project.yml
+```
+
+## Prerequisites
+
+Before starting the deployment, ensure you have the following tools installed:
+
+### 1. Install Minikube
+```bash
+# macOS
+brew install minikube
+
+# Start minikube with sufficient resources
+minikube start --cpus=4 --memory=8192 --disk-size=20g --driver=docker
+```
+
+### 2. Install Helm
+```bash
+# macOS
+brew install helm
+```
+
+### 3. Add Airflow Helm Repository
+```bash
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+```
+
+## Deployment Steps
+
+### Step 1: Prepare Kubernetes Environment
+```bash
+# Ensure minikube is running
+minikube status
+
+# Set kubectl context to minikube
+kubectl config use-context minikube
+
+# Verify cluster access
+kubectl cluster-info
+```
+
+### Step 2: Deploy MySQL (Metadata Database)
+The MySQL deployment is included in the airflow-values.yaml file. It will be deployed with Airflow.
+
+**MySQL Configuration:**
+- **Root Password:** `rootpassword123`
+- **Database:** `airflow`
+- **User:** `airflow`
+- **Password:** `airflow123`
+- **Resources:** CPU: 100m-200m, Memory: 256Mi-512Mi
+- **Service:** `mysql-service:3306`
+
+### Step 3: Deploy MinIO (Log Storage)
+MinIO is configured as part of the values.yaml for log storage.
+
+**MinIO Configuration:**
+- **Access Key:** `minioadmin`
+- **Secret Key:** `minioadmin123`
+- **API Port:** `9000`
+- **Console Port:** `9090`
+- **Resources:** CPU: 100m-200m, Memory: 256Mi-512Mi
+- **Service:** `minio-service:9000`
+
+### Step 4: Deploy Airflow with Helm
+```bash
+# Create namespace for airflow (optional)
+kubectl create namespace airflow
+
+# Deploy Airflow using Helm with custom values
+helm install airflow apache-airflow/airflow \
+    --namespace default \
+    --values airflow-values.yaml \
+    --timeout 10m
+
+# Verify deployment
+kubectl get pods
+kubectl get services
+```
+
+### Step 5: Wait for Deployment to Complete
+```bash
+# Watch pod status
+kubectl get pods -w
+
+# Check airflow logs
+kubectl logs -l app.kubernetes.io/name=airflow
+
+# Verify all pods are running
+kubectl get pods | grep airflow
+```
+
+### Step 6: Port Forward Services
+
+#### Port Forward Airflow UI
+```bash
+# Forward Airflow webserver port
+kubectl port-forward svc/airflow-webserver 8080:8080
+
+# Access Airflow UI at: http://localhost:8080
+# Default credentials: admin / admin
+```
+
+#### Port Forward MinIO Console
+```bash
+# Forward MinIO console port (in a separate terminal)
+kubectl port-forward svc/minio-service 9090:9090
+
+# Access MinIO console at: http://localhost:9090
+# Credentials: minioadmin / minioadmin123
+```
+
+#### Port Forward MySQL (Optional)
+```bash
+# Forward MySQL port for local connection (in a separate terminal)
+kubectl port-forward svc/mysql-service 3306:3306
+
+# Connect using: mysql -h localhost -P 3306 -u airflow -p
+# Password: airflow123
+```
+
+## Airflow Configuration Details
+
+### Executor Configuration
+- **Type:** KubernetesExecutor
+- **Namespace:** default
+- **Worker Pods:** Auto-scaled and auto-deleted
+- **Worker Image:** apache/airflow:2.10.2
+
+### Git Sync Configuration
+- **Repository:** This repository (airflow-dags)
+- **Branch:** airflow-kubernetes-deployment
+- **Sync Interval:** 60 seconds
+- **SubPath:** "" (root directory)
+
+### Database Configuration
+- **Type:** MySQL 8.0
+- **Connection:** `mysql://airflow:airflow123@mysql-service:3306/airflow`
+- **SSL:** Disabled for local development
+
+### Logging Configuration
+- **Remote Logging:** Enabled
+- **Storage:** MinIO S3-compatible storage
+- **Bucket:** airflow-logs
+- **Connection:** `s3://minioadmin:minioadmin123@minio-service:9000`
+
+## dbt Integration
+
+### dbt Project Setup
+The repository includes a dbt project configured to work with Airflow:
+
+```bash
+# dbt project structure
+dbt/
+├── dbt_project.yml
+├── models/
+│   ├── staging/
+│   └── marts/
+└── profiles.yml
+```
+
+### dbt DAG Example
+The `dbt_dag.py` file contains an example DAG that runs dbt commands:
+- `dbt deps`: Install dbt packages
+- `dbt run`: Execute dbt models
+- `dbt test`: Run dbt tests
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. Pods Stuck in Pending State
+```bash
+# Check node resources
+kubectl top nodes
+kubectl describe nodes
+
+# Check pod events
+kubectl describe pod <pod-name>
+```
+
+#### 2. Database Connection Issues
+```bash
+# Test MySQL connection
+kubectl exec -it <mysql-pod> -- mysql -u airflow -p airflow
+
+# Check connection strings in Airflow config
+kubectl exec -it <airflow-scheduler-pod> -- airflow config get-value database sql_alchemy_conn
+```
+
+#### 3. Git Sync Issues
+```bash
+# Check git-sync logs
+kubectl logs <airflow-scheduler-pod> -c git-sync
+
+# Verify git repository access
+kubectl exec -it <airflow-scheduler-pod> -c git-sync -- ls /opt/airflow/dags
+```
+
+#### 4. MinIO Connection Issues
+```bash
+# Check MinIO service
+kubectl get svc minio-service
+
+# Test MinIO connectivity
+kubectl exec -it <airflow-scheduler-pod> -- python -c "import boto3; print('MinIO connection test')"
+```
+
+### Useful Commands
+
+#### Check Deployment Status
+```bash
+# Get all resources
+kubectl get all
+
+# Check persistent volumes (should be empty as PVC is disabled)
+kubectl get pv,pvc
+
+# Check secrets
+kubectl get secrets
+```
+
+#### Scale Deployment
+```bash
+# Scale scheduler (if needed)
+kubectl scale deployment airflow-scheduler --replicas=2
+
+# Scale webserver
+kubectl scale deployment airflow-webserver --replicas=2
+```
+
+#### Update Deployment
+```bash
+# Update Airflow with new values
+helm upgrade airflow apache-airflow/airflow \
+    --namespace default \
+    --values airflow-values.yaml
+
+# Restart deployment
+kubectl rollout restart deployment airflow-scheduler
+kubectl rollout restart deployment airflow-webserver
+```
+
+## Development Workflow
+
+### Adding New DAGs
+1. Create new DAG files in the `dags/` directory
+2. Commit changes to the `airflow-kubernetes-deployment` branch
+3. Git-sync will automatically sync changes within 60 seconds
+4. New DAGs will appear in Airflow UI
+
+### Adding New Dependencies
+1. Update `requirements.txt` with new Python packages
+2. Rebuild Airflow image or update `extraPipPackages` in values.yaml
+3. Update Helm deployment
+
+### Local Development
+```bash
+# Test DAG syntax locally
+python dags/your_dag.py
+
+# Install dependencies locally
+pip install -r requirements.txt
+```
+
+## Security Notes
+
+**⚠️ WARNING:** This configuration includes hardcoded secrets and is intended for **DEVELOPMENT/TESTING ONLY**.
+
+For production deployments:
+1. Use Kubernetes secrets properly
+2. Enable TLS/SSL for all connections
+3. Use proper authentication mechanisms
+4. Implement network policies
+5. Use image scanning and security policies
+
+## Performance Optimization
+
+### Resource Tuning
+The current configuration uses minimal resources suitable for development:
+- **MySQL:** 100m CPU, 256Mi RAM
+- **MinIO:** 100m CPU, 256Mi RAM
+- **Airflow Components:** 250m-500m CPU, 512Mi-1Gi RAM
+
+For production workloads, increase these values based on requirements.
+
+### Monitoring
+```bash
+# Check resource usage
+kubectl top pods
+kubectl top nodes
+
+# View metrics (if metrics-server is installed)
+minikube addons enable metrics-server
+```
+
+## Cleanup
+
+### Remove Deployment
+```bash
+# Uninstall Airflow
+helm uninstall airflow
+
+# Remove persistent data (if any)
+kubectl delete pvc --all
+
+# Stop minikube (optional)
+minikube stop
+```
+
+## Support
+
+For issues and improvements:
+1. Check logs: `kubectl logs <pod-name>`
+2. Describe resources: `kubectl describe <resource-type> <resource-name>`
+3. Review Airflow documentation: https://airflow.apache.org/docs/
+4. Check Helm chart documentation: https://airflow.apache.org/docs/helm-chart/
