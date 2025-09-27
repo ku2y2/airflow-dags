@@ -25,3 +25,8 @@ helm upgrade airflow apache-airflow/airflow -f airflow-values.yaml -n default
 # Fresh install with git sync (clean deployment)
 helm uninstall airflow
 helm install airflow apache-airflow/airflow -f airflow-values.yaml -n default --timeout 15m
+
+
+You can get Fernet Key value by running the following:
+
+echo Fernet Key: $(kubectl get secret --namespace default airflow-fernet-key -o jsonpath="{.data.fernet-key}" | base64 --decode)
