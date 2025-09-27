@@ -1,11 +1,12 @@
 # Apache Airflow and core dependencies (compatible with 2.7.0)
+apache-airflow==2.10.2
 apache-airflow-providers-cncf-kubernetes
 apache-airflow-providers-amazon
 apache-airflow-providers-http
 
 # dbt and related packages (core only for simplicity)
-dbt-core>=1.7.0,<1.8.0
-dbt-postgres>=1.7.0,<1.8.0
+dbt-core==1.6.4
+dbt-tidb==1.6.4
 
 # Database connectors (using PyMySQL instead of mysqlclient)
 pymysql>=1.0.2

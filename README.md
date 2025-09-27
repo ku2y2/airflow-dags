@@ -276,8 +276,9 @@ kubectl rollout restart deployment airflow-webserver
 
 ### Adding New Dependencies
 1. Update `requirements.txt` with new Python packages
-2. Rebuild Airflow image or update `extraPipPackages` in values.yaml
-3. Update Helm deployment
+2. Update `Dockerfile` if needed for system dependencies
+3. Rebuild custom Airflow image and deploy (see Custom Image section below)
+4. Update Helm deployment
 
 ### Local Development
 ```bash
@@ -286,6 +287,101 @@ python dags/your_dag.py
 
 # Install dependencies locally
 pip install -r requirements.txt
+```
+
+## Custom Docker Image
+
+This deployment uses a custom Airflow image with additional packages including dbt, database connectors, and other dependencies.
+
+### Current Custom Image Configuration
+
+The custom image `custom-airflow:2.10.2` includes:
+- **Base**: Apache Airflow 2.10.2 with Python 3.11
+- **dbt packages**: dbt-core==1.6.4, dbt-tidb==1.6.4
+- **Database connectors**: PyMySQL for MySQL connections
+- **Additional packages**: pandas, boto3, kubernetes, minio
+- **System dependencies**: build tools, git, MySQL client libraries
+
+### Building and Deploying Custom Image
+
+#### Prerequisites
+```bash
+# Set Docker environment to use minikube
+eval $(minikube docker-env)
+```
+
+#### Build Process
+```bash
+# 1. Update requirements.txt with new packages
+# 2. Update Dockerfile if system dependencies needed
+# 3. Build the custom image
+docker build -t custom-airflow:2.10.2 .
+
+# 4. Update airflow-values.yaml to use custom image
+# 5. Upgrade deployment
+helm upgrade airflow apache-airflow/airflow -f airflow-values.yaml -n default
+```
+
+#### Dockerfile Structure
+```dockerfile
+FROM apache/airflow:2.10.2-python3.11
+
+# Switch to root for system dependencies
+USER root
+RUN apt-get update && apt-get install -y \
+    build-essential git pkg-config \
+    default-libmysqlclient-dev libmariadb-dev
+
+# Switch back to airflow user
+USER airflow
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+```
+
+#### Custom Requirements
+Current `requirements.txt` includes:
+```
+# Core Airflow and providers
+apache-airflow==2.10.2
+apache-airflow-providers-cncf-kubernetes
+apache-airflow-providers-amazon
+apache-airflow-providers-http
+
+# dbt integration
+dbt-core==1.6.4
+dbt-tidb==1.6.4
+
+# Database and storage
+pymysql>=1.0.2
+pandas>=1.5.0,<2.0.0
+boto3>=1.26.0
+kubernetes>=24.2.0
+minio>=7.1.0
+```
+
+### Commands Used for Custom Image Deployment
+
+All commands have been documented in `commands.txt`:
+```bash
+# Save current deployed values
+helm get values airflow -n default > value-old.yaml
+
+# Build custom image in minikube
+eval $(minikube docker-env)
+docker build -t custom-airflow:2.10.2 .
+
+# Deploy with custom image
+helm upgrade airflow apache-airflow/airflow -f airflow-values.yaml -n default
+```
+
+### Verifying Custom Image
+```bash
+# Check that pods are using custom image
+kubectl describe pod <airflow-pod-name> | grep Image
+# Should show: custom-airflow:2.10.2
+
+# Verify custom packages are installed (once pods are running)
+kubectl exec <airflow-pod> -- pip list | grep -E "(dbt|pymysql|pandas|minio)"
 ```
 
 ## Security Notes
@@ -369,10 +465,12 @@ minikube stop
 
 ### 🔧 Key Configuration Details
 - **Airflow Version**: 2.10.2 (upgraded from 2.7.0 for better provider compatibility)
+- **Docker Image**: Custom image `custom-airflow:2.10.2` with dbt and additional packages
 - **Executor**: KubernetesExecutor for auto-scaling worker pods
 - **Database**: MySQL 8.0 with optimized connection settings
 - **Storage**: MinIO for distributed log storage
 - **Authentication**: Built-in Flask-AppBuilder auth with admin/admin credentials
+- **Custom Packages**: dbt-core, dbt-tidb, PyMySQL, pandas, boto3, kubernetes, minio
 
 ## Step-by-Step Deployment Commands Used
 
@@ -388,9 +486,13 @@ kubectl delete job airflow-run-airflow-migrations  # Clean leftover jobs
 kubectl delete pod airflow-webserver-957d7b6fd-57tzx  # Clean leftover pods
 ```
 
-### 3. Deploy Airflow with Helm
+### 3. Build and Deploy Custom Airflow Image
 ```bash
-helm install airflow apache-airflow/airflow \
+# Build custom image with dbt and additional packages
+docker build -t custom-airflow:2.10.2 .
+
+# Deploy/upgrade Airflow with custom image
+helm upgrade airflow apache-airflow/airflow \
     --namespace default \
     --values airflow-values.yaml \
     --timeout 15m

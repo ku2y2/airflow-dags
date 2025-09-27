@@ -1,0 +1,140 @@
+USER-SUPPLIED VALUES:
+airflowVersion: 2.10.2
+config:
+  core:
+    dags_are_paused_at_creation: "True"
+    executor: KubernetesExecutor
+    load_examples: "False"
+    max_active_runs_per_dag: 1
+    parallelism: 32
+  kubernetes:
+    delete_worker_pods: "True"
+    namespace: default
+    worker_container_repository: apache/airflow
+    worker_container_tag: 2.10.2
+  logging:
+    encrypt_s3_logs: "False"
+    logging_level: INFO
+    remote_base_log_folder: s3://airflow-logs/
+    remote_log_conn_id: minio_default
+    remote_logging: "True"
+  webserver:
+    default_ui_timezone: UTC
+    expose_config: "True"
+    show_trigger_form_if_no_params: "True"
+    warn_deployment_exposure: "False"
+createUserJob:
+  applyCustomEnv: false
+  useHelmHooks: false
+dags:
+  gitSync:
+    enabled: false
+  persistence:
+    accessMode: ReadWriteMany
+    enabled: false
+    size: 4Gi
+    storageClassName: ""
+data:
+  metadataConnection:
+    db: airflow
+    host: mysql-service
+    pass: airflow123
+    port: 3306
+    protocol: mysql
+    sslmode: disable
+    user: airflow
+defaultAirflowRepository: apache/airflow
+defaultAirflowTag: 2.10.2
+env:
+- name: AIRFLOW_CONN_MINIO_DEFAULT
+  value: s3://minioadmin:minioadmin123@minio-service:9000?host=http://minio-service:9000&region=us-east-1
+executor: KubernetesExecutor
+fernetKey: 81HqDtbqAywKSOumSHA3BhWNOdQ26slT6K0YaZeZyPs=
+flower:
+  enabled: false
+images:
+  airflow:
+    pullPolicy: IfNotPresent
+    repository: apache/airflow
+    tag: 2.10.2
+migrateDatabaseJob:
+  applyCustomEnv: false
+  enabled: true
+  useHelmHooks: false
+pgbouncer:
+  enabled: false
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+scheduler:
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  serviceAccount:
+    annotations: {}
+    create: true
+    name: ""
+serviceAccount:
+  annotations: {}
+  create: true
+  name: ""
+statsd:
+  enabled: false
+triggerer:
+  enabled: true
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  serviceAccount:
+    annotations: {}
+    create: true
+    name: ""
+webserver:
+  defaultUser:
+    email: admin@example.com
+    enabled: true
+    firstName: admin
+    lastName: user
+    password: admin
+    role: Admin
+    username: admin
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  serviceAccount:
+    annotations: {}
+    create: true
+    name: ""
+webserverSecretKey: your-secret-key-here-change-in-production
+workers:
+  env:
+  - name: AIRFLOW_ENV
+    value: development
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  serviceAccount:
+    annotations: {}
+    create: true
+    name: ""

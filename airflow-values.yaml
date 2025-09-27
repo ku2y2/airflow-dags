@@ -1,14 +1,14 @@
 # Airflow Values based on working sample.yaml
 # Adapted for Airflow 2.7.0, MySQL, MinIO, and minikube
 
-# Use default Airflow 2.10.2 image (latest stable with better provider support)
+# Use custom Airflow 2.10.2 image with dbt and additional packages
 images:
   airflow:
-    repository: apache/airflow
+    repository: custom-airflow
     tag: "2.10.2"
     pullPolicy: IfNotPresent
 
-defaultAirflowRepository: apache/airflow
+defaultAirflowRepository: custom-airflow
 defaultAirflowTag: "2.10.2"
 
 # Airflow version 2.10.2
@@ -169,7 +169,7 @@ config:
     expose_config: "True"
   kubernetes:
     namespace: default
-    worker_container_repository: apache/airflow
+    worker_container_repository: custom-airflow
     worker_container_tag: "2.10.2"
     delete_worker_pods: "True"
 

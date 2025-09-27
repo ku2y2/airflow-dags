@@ -1,0 +1,20 @@
+# Save deployed values before making changes
+helm get values airflow -n default > value-old.yaml
+
+# Build custom Airflow image with dbt and additional packages
+eval $(minikube docker-env)
+docker build -t custom-airflow:2.10.2 .
+
+# Initial upgrade attempt (had issues with old pods)
+helm upgrade airflow apache-airflow/airflow -f airflow-values.yaml -n default
+
+# Clean up conflicting old pods and deployments
+kubectl delete pod airflow-webserver-755d8cf86c-qp824 airflow-scheduler-bc9b45b96-6cjdt
+kubectl delete deployment airflow-scheduler airflow-webserver
+
+# Complete cleanup and fresh install
+helm uninstall airflow
+helm install airflow apache-airflow/airflow -f airflow-values.yaml -n default --timeout 15m
+
+
+kubectl port-forward svc/airflow-webserver 8080:8080

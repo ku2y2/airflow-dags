@@ -1,5 +1,5 @@
 # Custom Airflow Docker Image with dbt and additional requirements
-FROM apache/airflow:2.7.0-python3.11
+FROM apache/airflow:2.10.2-python3.11
 
 # Switch to root user to install system dependencies
 USER root
@@ -23,7 +23,7 @@ USER airflow
 COPY requirements.txt /requirements.txt
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
 # Set environment variables
 ENV PYTHONPATH="${PYTHONPATH}:/opt/airflow"
