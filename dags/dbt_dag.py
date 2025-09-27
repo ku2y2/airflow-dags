@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 
 default_args = {
     'owner': 'airflow',
@@ -14,82 +14,63 @@ default_args = {
 }
 
 dag = DAG(
-    'dbt_kubernetes_dag',
+    'dbt_example_dag',
     default_args=default_args,
-    description='A dbt DAG running on KubernetesExecutor',
-    schedule_interval=timedelta(hours=6),
+    description='A DAG that runs dbt models',
+    schedule_interval=timedelta(days=1),
     catchup=False,
-    tags=['dbt', 'kubernetes', 'data-pipeline'],
+    tags=['dbt', 'transformation'],
 )
 
-# dbt deps task
-dbt_deps = KubernetesPodOperator(
-    task_id='dbt_deps',
-    name='dbt-deps',
-    namespace='default',
-    image='ghcr.io/dbt-labs/dbt-postgres:1.8.0',
-    cmds=['/bin/bash', '-c'],
-    arguments=[
-        '''
-        cd /opt/airflow/dbt &&
-        dbt deps --profiles-dir /opt/airflow/dbt
-        '''
-    ],
-    volumes=[],
-    volume_mounts=[],
-    env_vars={
-        'DBT_PROFILES_DIR': '/opt/airflow/dbt',
-    },
-    is_delete_operator_pod=True,
-    get_logs=True,
+def create_database():
+    import mysql.connector
+
+    config = {
+        'user': 'airflow',
+        'password': 'airflow123',
+        'host': 'mysql-service.default.svc.cluster.local',
+        'port': 3306,
+        'database': 'airflow'
+    }
+
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Create dbt_dev database if it doesn't exist
+    cursor.execute("CREATE DATABASE IF NOT EXISTS dbt_dev")
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    print("Database dbt_dev created successfully!")
+
+create_db_task = PythonOperator(
+    task_id='create_dbt_database',
+    python_callable=create_database,
     dag=dag,
 )
 
-# dbt run task
-dbt_run = KubernetesPodOperator(
+# dbt debug to test connection
+dbt_debug = BashOperator(
+    task_id='dbt_debug',
+    bash_command='cd /opt/airflow/dags/dbt && dbt debug --profiles-dir .',
+    dag=dag,
+)
+
+# dbt run to execute models
+dbt_run = BashOperator(
     task_id='dbt_run',
-    name='dbt-run',
-    namespace='default',
-    image='ghcr.io/dbt-labs/dbt-postgres:1.8.0',
-    cmds=['/bin/bash', '-c'],
-    arguments=[
-        '''
-        cd /opt/airflow/dbt &&
-        dbt run --profiles-dir /opt/airflow/dbt --target dev
-        '''
-    ],
-    volumes=[],
-    volume_mounts=[],
-    env_vars={
-        'DBT_PROFILES_DIR': '/opt/airflow/dbt',
-    },
-    is_delete_operator_pod=True,
-    get_logs=True,
+    bash_command='cd /opt/airflow/dags/dbt && dbt run --profiles-dir .',
     dag=dag,
 )
 
-# dbt test task
-dbt_test = KubernetesPodOperator(
+# dbt test to run tests
+dbt_test = BashOperator(
     task_id='dbt_test',
-    name='dbt-test',
-    namespace='default',
-    image='ghcr.io/dbt-labs/dbt-postgres:1.8.0',
-    cmds=['/bin/bash', '-c'],
-    arguments=[
-        '''
-        cd /opt/airflow/dbt &&
-        dbt test --profiles-dir /opt/airflow/dbt --target dev
-        '''
-    ],
-    volumes=[],
-    volume_mounts=[],
-    env_vars={
-        'DBT_PROFILES_DIR': '/opt/airflow/dbt',
-    },
-    is_delete_operator_pod=True,
-    get_logs=True,
+    bash_command='cd /opt/airflow/dags/dbt && dbt test --profiles-dir .',
     dag=dag,
 )
 
 # Set task dependencies
-dbt_deps >> dbt_run >> dbt_test
+dbt_debug >> dbt_run >> dbt_test
