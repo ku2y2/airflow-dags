@@ -18,3 +18,10 @@ helm install airflow apache-airflow/airflow -f airflow-values.yaml -n default --
 
 
 kubectl port-forward svc/airflow-webserver 8080:8080
+
+# Enable Git Sync and redeploy
+helm upgrade airflow apache-airflow/airflow -f airflow-values.yaml -n default
+
+# Fresh install with git sync (clean deployment)
+helm uninstall airflow
+helm install airflow apache-airflow/airflow -f airflow-values.yaml -n default --timeout 15m

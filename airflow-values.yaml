@@ -25,7 +25,16 @@ dags:
     storageClassName: ""
     accessMode: ReadWriteMany
   gitSync:
-    enabled: false
+    enabled: true
+    repo: https://github.com/ku2y2/airflow-dags.git
+    branch: airflow-kubernetes-deployment
+    rev: HEAD
+    depth: 1
+    maxFailures: 0
+    subPath: "dags"
+    wait: 60
+    containerName: git-sync
+    uid: 65533
 
 # Disable built-in PostgreSQL
 postgresql:
