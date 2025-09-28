@@ -1,0 +1,85 @@
+# MinIO Deployment for Airflow Log Storage (S3-compatible)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app: minio
+    component: storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: storage
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - minio server /data --console-address :9090
+        env:
+        - name: MINIO_ACCESS_KEY
+          value: "minioadmin"
+        - name: MINIO_SECRET_KEY
+          value: "minioadmin123"
+        - name: MINIO_ROOT_USER
+          value: "minioadmin"
+        - name: MINIO_ROOT_PASSWORD
+          value: "minioadmin123"
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9090
+          name: console
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: minio-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  labels:
+    app: minio
+    component: storage
+spec:
+  selector:
+    app: minio
+  ports:
+  - name: api
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
