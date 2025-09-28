@@ -112,6 +112,8 @@ scheduler:
 triggerer:
   enabled: true
   replicas: 1
+  persistence:
+    enabled: false
   resources:
     requests:
       memory: "512Mi"
@@ -156,6 +158,11 @@ migrateDatabaseJob:
   useHelmHooks: false
   applyCustomEnv: false
 
+# Disable log persistence
+logs:
+  persistence:
+    enabled: false
+
 # Airflow configuration
 config:
   core:
@@ -182,10 +189,43 @@ config:
     worker_container_tag: "2.10.2"
     delete_worker_pods: "True"
 
-# Environment variables for MinIO connection
+# Environment variables for MinIO connection and S3 logging
 env:
   - name: AIRFLOW_CONN_MINIO_DEFAULT
-    value: "s3://minioadmin:minioadmin123@minio-service:9000?host=http://minio-service:9000&region=us-east-1"
+    value: "aws://minioadmin:minioadmin123@?region_name=us-east-1&host=http://minio-service:9000"
+  - name: AWS_ACCESS_KEY_ID
+    value: "minioadmin"
+  - name: AWS_SECRET_ACCESS_KEY
+    value: "minioadmin123"
+  - name: AWS_DEFAULT_REGION
+    value: "us-east-1"
+  - name: AWS_ENDPOINT_URL_S3
+    value: "http://minio-service:9000"
+  - name: AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID
+    value: "minio_default"
+  - name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER
+    value: "s3://airflow-logs"
+  # OIDC configuration disabled until Keycloak is deployed
+  # - name: AIRFLOW__WEBSERVER__OIDC_ISSUER
+  #   value: "http://host.docker.internal:8080/realms/airflow"
+  # - name: AIRFLOW__WEBSERVER__OIDC_CLIENT_ID
+  #   value: "airflow"
+  # - name: AIRFLOW__WEBSERVER__OIDC_CLIENT_SECRET
+  #   value: "UveJ40trWXFzIwQaX66KMvefIc0qre0L"
+  # - name: AIRFLOW__WEBSERVER__OIDC_FIELD_TO_USERNAME
+  #   value: "preferred_username"
+  # - name: AIRFLOW__WEBSERVER__OIDC_FIELD_TO_EMAIL
+  #   value: "email"
+  # - name: AIRFLOW__WEBSERVER__OIDC_FIELD_TO_FIRST_NAME
+  #   value: "given_name"
+  # - name: AIRFLOW__WEBSERVER__OIDC_FIELD_TO_LAST_NAME
+  #   value: "family_name"
+  # - name: AIRFLOW__WEBSERVER__OIDC_FIELD_TO_GROUPS
+  #   value: "groups"
+  # - name: AIRFLOW__WEBSERVER__OIDC_AUTO_REGISTER
+  #   value: "True"
+  # - name: AIRFLOW__WEBSERVER__OIDC_DEFAULT_ROLE
+  #   value: "Viewer"
 
 ---
 # MySQL Deployment
